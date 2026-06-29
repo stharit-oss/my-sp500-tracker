@@ -4,13 +4,26 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-st.set_page_config(layout="wide", page_title="Global Stock Divergence Tracker")
-st.title("📈 Global Bullish Divergence & Performance Tracker")
-st.write("ระบบคัดกรองหุ้นระดับโลก (US & TH) ที่มีสัญญาณกลับตัว (Bullish Divergence) และจัดอันดับความน่าสนใจ")
+# ตั้งค่าหน้าเว็บให้เป็นแบบ Wide และปรับธีมเบื้องต้น
+st.set_page_config(layout="wide", page_title="AlphaTrack - Global Dashboard", page_icon="📈")
 
-# 1. จัดหมวดหมู่รายชื่อหุ้นตัวท็อปแต่ละตลาด (US S&P500/NASDAQ & Thai SET)
+# ตกแต่งสไตล์ CSS เพิ่มเติมเพื่อให้ปุ่มและตารางดูโมเดิร์นขึ้น
+st.markdown("""
+    <style>
+    .main .block-container { padding-top: 2rem; padding-bottom: 2rem; }
+    h1 { font-weight: 800; color: #00FFCC; letter-spacing: -1px; }
+    .stRadio i { color: #00FFCC; }
+    div[data-testid="stMetricValue"] { font-size: 24px; font-weight: 700; color: #00FFCC; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("⚡ AlphaTrack: Global Divergence Dashboard")
+st.caption("ระบบสแกนสัญญาณเทคนิคและจัดอันดับหุ้นชั้นนำระดับโลกแบบ Real-time Simulation")
+st.markdown("---")
+
+# 1. ข้อมูลรายชื่อหุ้นระดับสากล
 MARKET_DATA = {
-    "🇺🇸 สหรัฐอเมริกา (S&P 500 & NASDAQ)": [
+    "🇺🇸 สหรัฐอเมริกา (S&P 500 / NASDAQ)": [
         'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'COST', 'AMD',
         'NFLX', 'QCOM', 'JPM', 'V', 'DIS', 'WMT', 'XOM', 'JNJ', 'PG', 'ORCL'
     ],
@@ -20,115 +33,140 @@ MARKET_DATA = {
     ]
 }
 
-# 2. ฟังก์ชันจำลองข้อมูลความเร็วสูงแยกตามตลาด
 @st.cache_data
-def generate_market_mock_data():
+def generate_premium_mock_data():
     all_data = {}
     end_date = datetime.now()
     dates = [end_date - timedelta(days=i) for i in range(60)][::-1]
+    np.random.seed(2026) # กำหนดปีปัจจุบันเป็น Seed
     
-    np.random.seed(100) # ล็อคค่าสุ่ม
-    
-    # วนลูปสร้างข้อมูลหุ้นทุกตัวในทุกตลาด
     for market, tickers in MARKET_DATA.items():
         for t in tickers:
-            # จำลองราคาหุ้นตามประเภทตลาด (หุ้นไทยหลักสิบบาท หุ้นนอกหลักร้อยเหรียญ)
             is_thai = t.endswith('.BK')
             start_price = np.random.uniform(30, 150) if is_thai else np.random.uniform(150, 600)
-            
-            returns = np.random.normal(0.0005, 0.015, 60)
+            returns = np.random.normal(0.0006, 0.018, 60)
             price_series = start_price * np.cumprod(1 + returns)
             
-            # สุ่มสร้างสัญญาณ Divergence ให้บางตัว (เช่น TSLA, NVDA, DELTA.BK, KBANK.BK)
-            has_divergence = t in ['NVDA', 'TSLA', 'DELTA.BK', 'KBANK.BK']
+            # เจาะจงให้หุ้นบางตัวเกิดสัญญาณซื้อที่สวยงาม
+            has_divergence = t in ['NVDA', 'TSLA', 'DELTA.BK', 'KBANK.BK', 'ADVANC.BK']
             if has_divergence:
-                rsi_series = np.linspace(24, 42, 60) + np.random.normal(0, 2.5, 60)
-                price_series[-10:] = price_series[-10:] * 0.93 # ราคาย่อลง แต่ RSI ยกตัวขึ้น
+                rsi_series = np.linspace(23, 41, 60) + np.random.normal(0, 2, 60)
+                price_series[-10:] = price_series[-10:] * 0.91 
             else:
-                rsi_series = np.random.uniform(38, 75, 60)
+                rsi_series = np.random.uniform(35, 78, 60)
                 
             df = pd.DataFrame({
                 'Close': price_series,
                 'RSI_14': np.clip(rsi_series, 0, 100)
             }, index=dates)
             all_data[t] = df
-            
     return all_data
 
-# โหลดข้อมูลเข้าสู่ระบบ
-all_stock_data = generate_market_mock_data()
+all_stock_data = generate_premium_mock_data()
 
-# 3. ส่วนควบคุมบนหน้าเว็บ (Sidebar / Filter)
-st.sidebar.header("🔍 ตัวกรองและเลือกตลาด")
-selected_market = st.sidebar.selectbox("เลือกตลาดหุ้นที่ต้องการดู:", list(MARKET_DATA.keys()))
-filter_option = st.sidebar.radio("ตัวกรองสัญญาณซื้อ:", ["แสดงทั้งหมด", "เฉพาะตัวที่เกิด Bullish Divergence 🔥"])
+# 2. จัดวางแถบควบคุม (Sidebar ดีไซน์ใหม่)
+with st.sidebar:
+    st.image("https://img.icons8.com/nolan/64/bullish.png", width=60)
+    st.header("🎛️ แผงควบคุมระบบ")
+    selected_market = st.selectbox("เลือกตลาดหุ้นที่ต้องการวิเคราะห์", list(MARKET_DATA.keys()))
+    st.markdown("---")
+    filter_option = st.radio("คัดกรองสัญญาณเทคนิค", ["แสดงหุ้นทั้งหมด", "เฉพาะ Bullish Divergence 🔥"])
+    st.markdown("---")
+    st.info("💡 **Bullish Divergence** คือ สัญญาณที่ราคามีการทำจุดต่ำสุดใหม่ แต่ดัชนี RSI เริ่มยกฐานสูงขึ้น บ่งบอกถึงโอกาสในการกลับตัวเป็นขาขึ้น")
 
-# คัดแยกรายชื่อหุ้นตามตลาดที่เลือก
 current_market_tickers = MARKET_DATA[selected_market]
 
-# 4. ประมวลผลสร้างตารางสรุปข้อมูล
+# 3. ประมวลผลและคำนวณข้อมูลตาราง
 screened_list = []
 for ticker in current_market_tickers:
     if ticker in all_stock_data:
         df = all_stock_data[ticker]
         pct_1d = ((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2]) * 100
         pct_1w = ((df['Close'].iloc[-1] - df['Close'].iloc[-5]) / df['Close'].iloc[-5]) * 100
-        
-        # เช็คว่าตัวนี้ถูกตั้งค่าให้เกิด Divergence ไหม
-        has_div = ticker in ['NVDA', 'TSLA', 'DELTA.BK', 'KBANK.BK']
-        
-        # ตกแต่งชื่อย่อหุ้นไทยให้ดูง่ายในตาราง
+        has_div = ticker in ['NVDA', 'TSLA', 'DELTA.BK', 'KBANK.BK', 'ADVANC.BK']
         display_ticker = ticker.replace('.BK', ' (TH)') if ticker.endswith('.BK') else ticker
         
         screened_list.append({
-            'Ticker Original': ticker, # เก็บชื่อจริงไว้ดึงข้อมูลกราฟ
-            'ชื่อหุ้น': display_ticker,
+            'Ticker_Raw': ticker,
+            'ชื่อย่อหุ้น': display_ticker,
             'ราคาล่าสุด': round(float(df['Close'].iloc[-1]), 2),
-            'เปลี่ยนแปลง 1 วัน (%)': round(float(pct_1d), 2),
-            'เปลี่ยนแปลง 1 สัปดาห์ (%)': round(float(pct_1w), 2),
+            'เปลี่ยนแปลง 1D': round(float(pct_1d), 2),
+            'เปลี่ยนแปลง 1W': round(float(pct_1w), 2),
             'RSI (14)': round(float(df['RSI_14'].iloc[-1]), 2),
-            'สถานะเทคนิค': "🔥 สัญญาณน่าซื้อ (Divergence)" if has_div else "ปกติ"
+            'สัญญาณ': "🔥 ซื้อ (Divergence)" if has_div else "⏳ ปกติ"
         })
 
 df_summary = pd.DataFrame(screened_list)
+total_divergence = len(df_summary[df_summary['สัญญาณ'].str.contains("ซื้อ")])
+top_gainer = df_summary.loc[df_summary['เปลี่ยนแปลง 1D'].idxmax()]
 
-# จัดการตัวกรองตามเงื่อนไขที่เลือกใน Sidebar
-if filter_option == "เฉพาะตัวที่เกิด Bullish Divergence 🔥":
-    df_display = df_summary[df_summary['สถานะเทคนิค'].str.contains("🔥")]
+# 4. ส่วนแสดงผลการวิเคราะห์ระดับบน (Top Metrics)
+m_col1, m_col2, m_col3 = st.columns(3)
+with m_col1:
+    st.metric(label="📊 ตลาดที่เลือกเทรด", value=selected_market.split()[1], delta=f"{len(current_market_tickers)} หุ้นในระบบ")
+with m_col2:
+    st.metric(label="🔥 หุ้นที่เกิด Divergence ตอนนี้", value=f"{total_divergence} ตัว", delta="น่าจับตาเปิดสถานะซื้อ", delta_color="normal")
+with m_col3:
+    st.metric(label="🚀 หุ้นที่บวกแรงที่สุดในวัน (Top Gainer)", value=top_gainer['ชื่อย่อหุ้น'], delta=f"+{top_gainer['เปลี่ยนแปลง 1D']}%")
+
+st.markdown("---")
+
+# 5. การจัดการตารางและการกรองผลข้อมูล
+if filter_option == "เฉพาะ Bullish Divergence 🔥":
+    df_display = df_summary[df_summary['สัญญาณ'].str.contains("ซื้อ")]
 else:
-    df_display = df_summary.sort_values(by='ชื่อหุ้น', ascending=True)
+    df_display = df_summary.sort_values(by='เปลี่ยนแปลง 1D', ascending=False) # สวยขึ้นโดยเรียงจากตัวที่บวกแรงที่สุด
 
-# 5. การแสดงผล Layout แบบ 2 ฝั่ง (ตาราง และ กราฟ)
-col1, col2 = st.columns([4, 5])
+# ใช้การแสดงผลแถบซ้าย-ขวา (Layout)
+layout_col1, layout_col2 = st.columns([4, 5])
 
-with col1:
-    st.subheader(f"📋 รายการหุ้นในตลาด {selected_market.split()[0]}")
+with layout_col1:
+    st.subheader("📋 รายการสรุปผลและอันดับหุ้น")
+    
     if not df_display.empty:
-        # แสดงตารางข้อมูลแบบซ่อนอินเด็กซ์
-        st.dataframe(df_display.drop(columns=['Ticker Original']), use_container_width=True, hide_index=True)
-        # กล่องเลือกหุ้นเพื่อดูกราฟ (ผูกโยงกับหุ้นในตารางที่โชว์)
-        ticker_map = dict(zip(df_display['ชื่อหุ้น'], df_display['Ticker Original']))
-        selected_display_name = st.selectbox("เลือกหุ้นที่ต้องการเปิดกราฟเทคนิค:", list(ticker_map.keys()))
-        target_ticker = ticker_map[selected_display_name]
+        # ฟังก์ชันจัดสีตารางอัตโนมัติ (สไตล์พรีเมียม)
+        def style_positive_negative(val):
+            if isinstance(val, (int, float)):
+                color = '#00FF66' if val > 0 else '#FF3366' if val < 0 else 'white'
+                return f'color: {color}; font-weight: bold;'
+            return ''
+            
+        styled_df = df_display.drop(columns=['Ticker_Raw']).style.map(style_positive_negative, subset=['เปลี่ยนแปลง 1D', 'เปลี่ยนแปลง 1W'])
+        
+        # แสดงผลตารางแบบโมเดิร์น
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        
+        # กล่องเลือกหุ้นดีไซน์กระชับ
+        ticker_map = dict(zip(df_display['ชื่อย่อหุ้น'], df_display['Ticker_Raw']))
+        selected_name = st.selectbox("🎯 เลือกหุ้นที่คุณสนใจ เพื่อเปิดหน้าจอกราฟวิเคราะห์ขั้นสูง:", list(ticker_map.keys()))
+        target_ticker = ticker_map[selected_name]
     else:
-        st.warning("⚠️ ไม่พบหุ้นที่ตรงตามเงื่อนไขตัวกรองในตลาดนี้ ณ ขณะนี้")
+        st.warning("ไม่มีหุ้นที่เกิดสัญญาณ Divergence ในตลาดนี้ ณ ขณะนี้")
         target_ticker = current_market_tickers[0]
 
-with col2:
-    st.subheader(f"📊 กราฟเทคนิคแบบ Interactive: {target_ticker.replace('.BK', '')}")
+with layout_col2:
+    st.subheader(f"📊 หน้าจอวิเคราะห์กราฟเทคนิค: {target_ticker.replace('.BK','')}")
+    
     if target_ticker in all_stock_data:
         df_plot = all_stock_data[target_ticker]
         
-        # พล็อตตัวกราฟราคา
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Close'], mode='lines', name='ราคา', line=dict(color='#00FFCC', width=2)))
-        fig.update_layout(title="กราฟราคาหุ้นย้อนหลัง", template="plotly_dark", height=240, margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        # ใช้ระบบ Tabs ช่วยจัดกลุ่มกราฟให้ดูดีเหมือน Streaming Platform
+        tab1, tab2 = st.tabs(["📉 กราฟราคาปัจจุบัน", "📈 ดัชนีโมเมนตัม RSI"])
         
-        # พล็อตตัวกราฟ RSI
-        fig_rsi = go.Figure()
-        fig_rsi.add_trace(go.Scatter(x=df_plot.index, y=df_plot['RSI_14'], mode='lines', name='RSI', line=dict(color='#FFCC00', width=1.5)))
-        fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought")
-        fig_rsi.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold")
-        fig_rsi.update_layout(title="ดัชนี RSI (14 วัน)", template="plotly_dark", height=180, yaxis=dict(range=[10, 90]), margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_rsi, use_container_width=True)
+        with tab1:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Close'], mode='lines+markers', name='Price', line=dict(color='#00FFCC', width=2.5)))
+            fig.update_layout(template="plotly_dark", height=280, margin=dict(l=10, r=10, t=10, b=10),
+                              paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                              xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#333333'))
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with tab2:
+            fig_rsi = go.Figure()
+            fig_rsi.add_trace(go.Scatter(x=df_plot.index, y=df_plot['RSI_14'], mode='lines', name='RSI', line=dict(color='#FFCC00', width=2)))
+            fig_rsi.add_hline(y=70, line_dash="dash", line_color="#FF3366")
+            fig_rsi.add_hline(y=30, line_dash="dash", line_color="#00FF66")
+            fig_rsi.update_layout(template="plotly_dark", height=280, margin=dict(l=10, r=10, t=10, b=10),
+                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                  yaxis=dict(range=[10, 90], showgrid=True, gridcolor='#333333'), xaxis=dict(showgrid=False))
+            st.plotly_chart(fig_rsi, use_container_width=True)
