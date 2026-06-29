@@ -62,7 +62,7 @@ with col1:
     if filter_option == "เฉพาะตัวที่น่าซื้อ (Divergence)":
         df_display = df_summary[df_summary['Bullish Divergence'].str.contains("🔥")]
     else:
-        df_display = df_summary.sort_values(by='1W %', ascending=False)
+    df_display = df_summary.sort_values(by='Ticker', ascending=True)
     st.dataframe(df_display, use_container_width=True, hide_index=True)
     selected_ticker = st.selectbox("เลือกหุ้นที่ต้องการดูกราฟเทคนิค:", df_display['Ticker'].tolist() if not df_display.empty else TICKERS)
 
